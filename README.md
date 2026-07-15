@@ -1,0 +1,1 @@
+This is Authentication API for Mango application.
