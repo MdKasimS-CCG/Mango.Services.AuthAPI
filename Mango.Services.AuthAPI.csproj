@@ -23,10 +23,11 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Mango.MessageBus" Version="1.0.0"/>
   </ItemGroup>
 
-  <ItemGroup>
+  <!-- <ItemGroup>
     <ProjectReference Include="..\Mango.MessageBus\Mango.MessageBus.csproj" />
-  </ItemGroup>
+  </ItemGroup> -->
 
 </Project>
