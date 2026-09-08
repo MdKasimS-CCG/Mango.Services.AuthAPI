@@ -30,7 +30,7 @@ jobs:
         run: |
           dotnet nuget add source \
             --username "${{ github.actor }}" \
-            --password "${{ secrets.GITHUB_TOKEN }}" \
+            --password "${{ secrets.GH_PACKAGES_TOKEN }}" \
             --store-password-in-clear-text \
             --name github \
             "https://nuget.pkg.github.com/MdKasimS-CCG/index.json"
