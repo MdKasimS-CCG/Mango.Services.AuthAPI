@@ -48,14 +48,22 @@ jobs:
       # Create temporary NuGet config for Docker
       - name: Create NuGet config
         run: |
-          dotnet nuget add source \
-            --username "${{ github.actor }}" \
-            --password "${{ secrets.GH_PACKAGES_TOKEN }}" \
-            --store-password-in-clear-text \
-            --name github \
-            "https://nuget.pkg.github.com/MdKasimS-CCG/index.json" \
-            --configfile ./NuGet.Config
-
+          cat > ./NuGet.Config <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+              <add key="github" value="https://nuget.pkg.github.com/MdKasimS-CCG/index.json" />
+            </packageSources>
+            <packageSourceCredentials>
+              <github>
+                <add key="Username" value="${{ github.actor }}" />
+                <add key="ClearTextPassword" value="${{ secrets.GH_PACKAGES_TOKEN }}" />
+              </github>
+            </packageSourceCredentials>
+          </configuration>
+          EOF
       # Build Docker image using NuGet config as a BuildKit secret
       - name: Build Docker image
         run: |
