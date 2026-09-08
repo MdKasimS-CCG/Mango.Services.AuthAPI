@@ -70,6 +70,17 @@ jobs:
           docker build \
             --secret id=nuget_config,src=./NuGet.Config \
             -t mango-authapi:latest .
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Docker image
+        run: |
+          docker tag mango-authapi:latest ghcr.io/mdkasims-ccg/mango-authapi:latest
+          docker push ghcr.io/mdkasims-ccg/mango-authapi:latest
 
       # Remove temporary credentials file
       - name: Remove NuGet config
