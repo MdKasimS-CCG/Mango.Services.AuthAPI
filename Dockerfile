@@ -14,7 +14,6 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Backend/Mango.Services.AuthAPI/Mango.Services.AuthAPI.csproj", "Backend/Mango.Services.AuthAPI/"]
-COPY ["Integration/Mango.MessageBus/Mango.MessageBus.csproj", "Integration/Mango.MessageBus/"]
 RUN dotnet restore "./Backend/Mango.Services.AuthAPI/Mango.Services.AuthAPI.csproj"
 COPY . .
 WORKDIR "/src/Backend/Mango.Services.AuthAPI"
