@@ -28,5 +28,4 @@ RUN dotnet publish "./Mango.Services.AuthAPI.csproj" -c $BUILD_CONFIGURATION -o 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-COPY --chmod=755 entrypoint.sh /app/entrypoint.sh
-ENTRYPOINT ["/app/entrypoint.sh", "Mango.Services.AuthAPI.dll"]
+ENTRYPOINT ["dotnet", "Mango.Services.AuthAPI.dll"]
