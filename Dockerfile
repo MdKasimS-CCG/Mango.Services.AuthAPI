@@ -14,7 +14,9 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Mango.Services.AuthAPI.csproj", "./"]
-RUN dotnet restore "./Mango.Services.AuthAPI.csproj"
+RUN --mount=type=secret,id=nuget_config,target=/root/.nuget/NuGet/NuGet.Config \
+    dotnet restore "./Mango.Services.AuthAPI.csproj"
+
 COPY . .
 WORKDIR "/src"
 RUN dotnet build "./Mango.Services.AuthAPI.csproj" -c $BUILD_CONFIGURATION -o /app/build

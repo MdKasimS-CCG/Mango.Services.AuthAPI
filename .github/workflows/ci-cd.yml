@@ -26,6 +26,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Authenticate normal .NET restore to GitHub Packages
       - name: Add GitHub Packages source
         run: |
           dotnet nuget add source \
@@ -43,5 +44,26 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build --configuration Release
+
+      # Create temporary NuGet config for Docker
+      - name: Create NuGet config
+        run: |
+          dotnet nuget add source \
+            --username "${{ github.actor }}" \
+            --password "${{ secrets.GH_PACKAGES_TOKEN }}" \
+            --store-password-in-clear-text \
+            --name github \
+            "https://nuget.pkg.github.com/MdKasimS-CCG/index.json" \
+            --configfile ./NuGet.Config
+
+      # Build Docker image using NuGet config as a BuildKit secret
       - name: Build Docker image
-        run: docker build -t mango-authapi:latest .
+        run: |
+          docker build \
+            --secret id=nuget_config,src=./NuGet.Config \
+            -t mango-authapi:latest .
+
+      # Remove temporary credentials file
+      - name: Remove NuGet config
+        if: always()
+        run: rm -f ./NuGet.Config
