@@ -25,13 +25,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+          cache: true
 
       # Authenticate normal .NET restore to GitHub Packages
       - name: Add GitHub Packages source
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
         run: |
           dotnet nuget add source \
             --username "${{ github.actor }}" \
-            --password "${{ secrets.GH_PACKAGES_TOKEN }}" \
+            --password "$GH_PACKAGES_TOKEN" \
             --store-password-in-clear-text \
             --name github \
             "https://nuget.pkg.github.com/MdKasimS-CCG/index.json"
@@ -47,6 +50,8 @@ jobs:
 
       # Create temporary NuGet config for Docker
       - name: Create NuGet config
+        env:
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
         run: |
           cat > ./NuGet.Config <<EOF
           <?xml version="1.0" encoding="utf-8"?>
@@ -59,7 +64,7 @@ jobs:
             <packageSourceCredentials>
               <github>
                 <add key="Username" value="${{ github.actor }}" />
-                <add key="ClearTextPassword" value="${{ secrets.GH_PACKAGES_TOKEN }}" />
+                <add key="ClearTextPassword" value="$GH_PACKAGES_TOKEN" />
               </github>
             </packageSourceCredentials>
           </configuration>
@@ -70,6 +75,7 @@ jobs:
           docker build \
             --secret id=nuget_config,src=./NuGet.Config \
             -t mango-authapi:latest .
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -78,7 +84,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push Docker image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
+          # GHCR uses the lowercase organization name for container image paths.
           docker tag mango-authapi:latest ghcr.io/mdkasims-ccg/mango-authapi:latest
           docker push ghcr.io/mdkasims-ccg/mango-authapi:latest
 
