@@ -37,9 +37,10 @@
         "ASPNETCORE_HTTP_PORTS": "8080",
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "publishAllPorts": true,
+      "publishAllPorts": false,
       "useSSL": true,
-      "containerRunEnvironmentFiles": "Backend\\Mango.Services.AuthAPI\\.env"
+      "containerRunArguments": "--env-file \"{ProjectDir}\\.env\"",
+      "httpPort": 5005
     }
   },
   "$schema": "http://json.schemastore.org/launchsettings.json",
