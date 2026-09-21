@@ -1,3 +1,4 @@
+using DotNetEnv;
 using Microsoft.Extensions.Options;
 using Mango.MessageBus;
 using Mango.Services.AuthAPI.Data;
@@ -19,7 +20,7 @@ if (string.IsNullOrWhiteSpace(profile))
 
 if (!isDocker)
 {
-    LoadEnvFile(".env");
+    Env.Load(".env");
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -95,62 +96,6 @@ void ApplyMigration()
         }
     }
 }
-
-
-// Load .env file for local execution without requiring an
-// additional NuGet package.
-void LoadEnvFile(string fileName)
-{
-    var envPath = Path.Combine(
-    Directory.GetParent(AppContext.BaseDirectory)!.Parent!.Parent!.Parent!.FullName,
-    fileName);
-
-    if (!File.Exists(envPath))
-    {
-        throw new FileNotFoundException(
-            $"The environment file '{fileName}' was not found.",
-            envPath);
-    }
-
-    foreach (var line in File.ReadLines(envPath))
-    {
-        var trimmedLine = line.Trim();
-
-        // Ignore blank lines and comments.
-        if (string.IsNullOrWhiteSpace(trimmedLine) ||
-            trimmedLine.StartsWith("#"))
-        {
-            continue;
-        }
-
-        // Support optional "export KEY=value".
-        if (trimmedLine.StartsWith("export "))
-        {
-            trimmedLine = trimmedLine["export ".Length..].Trim();
-        }
-
-        var separatorIndex = trimmedLine.IndexOf('=');
-
-        if (separatorIndex <= 0)
-        {
-            continue;
-        }
-
-        var key = trimmedLine[..separatorIndex].Trim();
-        var value = trimmedLine[(separatorIndex + 1)..].Trim();
-
-        // Remove surrounding quotes if present.
-        if (value.Length >= 2 &&
-            ((value.StartsWith('"') && value.EndsWith('"')) ||
-             (value.StartsWith('\'') && value.EndsWith('\''))))
-        {
-            value = value[1..^1];
-        }
-
-        Environment.SetEnvironmentVariable(key, value);
-    }
-}
-
 
 // Strongly typed database configuration.
 public class DatabaseOptions
