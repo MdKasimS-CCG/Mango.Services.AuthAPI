@@ -84,7 +84,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker buildx build \
-            --secret id=nuget_config,src=./NuGet.Config \
+            --secret id=nugetconfig,src=./NuGet.Config \
             --tag mango-authapi:latest \
             --load \
             --cache-from type=gha \
