@@ -55,6 +55,8 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.Configure<RabbitMqSettings>(
+builder.Configuration.GetSection("MessageQueue:RabbitMQ"));
 builder.Services.AddScoped<IMessageProducer, RabbitMQMessageProducer>();
 
 // Swagger/OpenAPI
