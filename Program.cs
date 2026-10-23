@@ -55,10 +55,36 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-builder.Services.Configure<RabbitMqSettings>(
-builder.Configuration.GetSection("MessageQueue:RabbitMQ"));
-builder.Services.AddScoped<IMessageProducer, RabbitMQMessageProducer>();
 
+builder.Services
+    .AddOptions<RabbitMqSettings>()
+    .Bind(builder.Configuration.GetSection("MessageQueue:RabbitMQ"))
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.HostName),
+        "RabbitMQ HostName is required.")
+    .Validate(
+        settings => settings.Port is >= 1 and <= 65535,
+        "RabbitMQ Port must be between 1 and 65535.")
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.UserName),
+        "RabbitMQ UserName is required.")
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.Password),
+        "RabbitMQ Password is required.")
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.VirtualHost),
+        "RabbitMQ VirtualHost is required.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<AuthQueueOptions>()
+    .Bind(builder.Configuration.GetSection("TopicAndQueueNames"))
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.RegisterUserQueue),
+        "TopicAndQueueNames:RegisterUserQueue is required.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IMessageProducer, RabbitMQMessageProducer>();
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -103,4 +129,9 @@ void ApplyMigration()
 public class DatabaseOptions
 {
     public string DefaultConnection { get; set; } = string.Empty;
+}
+
+public sealed class AuthQueueOptions
+{
+    public string RegisterUserQueue { get; set; } = string.Empty;
 }

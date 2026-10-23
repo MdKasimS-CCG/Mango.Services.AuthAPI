@@ -2,7 +2,6 @@
 
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-RUN apt-get update && apt-get install -y --no-install-recommends socat curl && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
@@ -14,8 +13,10 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Mango.Services.AuthAPI.csproj", "./"]
-RUN --mount=type=secret,id=nugetconfig,target=/root/.nuget/NuGet/NuGet.Config \
-    dotnet restore "./Mango.Services.AuthAPI.csproj"
+RUN --mount=type=bind,from=localnuget,target=/localnuget,ro \
+    dotnet restore "./Mango.Services.AuthAPI.csproj" \
+    --source /localnuget \
+    --source https://api.nuget.org/v3/index.json
 
 COPY . .
 WORKDIR "/src"
