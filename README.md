@@ -8,6 +8,7 @@ Mango.Services.AuthAPI is the authentication and user-management microservice in
 - [Technology](#technology)
 - [Features](#features)
 - [Registration Message Flow](#registration-message-flow)
+- [Shared MessageBus v3.0.0 Integration](#shared-messagebus-v300-integration)
 - [Configuration](#configuration)
 - [Prerequisites](#prerequisites)
 - [Run Locally](#run-locally)
@@ -33,7 +34,7 @@ AuthAPI also publishes registration-related messages to RabbitMQ through the sha
 - JWT authentication tokens
 - RabbitMQ
 - `Mango.MessageBus` NuGet package
-- `DotNetEnv` for local environment configuration
+- DotNetEnv for local environment configuration
 - Docker and Docker Compose
 - GitHub Actions
 
@@ -83,6 +84,45 @@ After a user is successfully registered, AuthAPI publishes a `UserDto` containin
 The destination queue is configured through `TopicAndQueueNames:RegisterUserQueue`.
 
 The queue name and RabbitMQ connection settings must match the configuration used by the corresponding consumer. A successful registration response does not, by itself, prove that the downstream message has been consumed.
+
+## Shared MessageBus v3.0.0 Integration
+
+AuthAPI now uses the shared `Mango.MessageBus` NuGet package for RabbitMQ publishing instead of maintaining its own RabbitMQ sender interface and implementation. The project references `Mango.MessageBus` version `3.0.0` and targets .NET 10.
+
+### Dependency injection
+
+`Program.cs` binds the RabbitMQ settings from `MessageQueue:RabbitMQ` and registers the producer as a singleton:
+
+```csharp
+builder.Services.Configure<RabbitMqSettings>(
+    builder.Configuration.GetSection("MessageQueue:RabbitMQ"));
+
+builder.Services.AddSingleton<IMessageProducer, RabbitMQMessageProducer>();
+```
+
+The singleton lifetime allows the producer to reuse its RabbitMQ connection across requests. RabbitMQ connection settings must be provided through the service configuration.
+
+### Registration message publishing
+
+After successful user registration, AuthAPI creates a `UserDto` and publishes it through `IMessageProducer`. The destination queue is read from `TopicAndQueueNames:RegisterUserQueue`. AuthAPI supplies an explicit message ID and queue options when publishing. The current configuration declares the queue as durable and supplies these dead-letter arguments:
+
+- `x-dead-letter-exchange`: `email.dlx`
+- `x-dead-letter-routing-key`: the configured registration queue name
+
+The `email.dlx` exchange must exist and the dead-letter destination and bindings must be configured consistently with the corresponding consumer and deployment topology. Publishers and consumers must agree on queue durability and arguments; redeclaring an existing queue with incompatible settings can cause RabbitMQ to return `PRECONDITION_FAILED` (406). Coordinate any queue-topology changes and plan a safe migration before deploying them. Do not delete a queue blindly, because queued messages may be lost.
+
+### GitHub Packages and Docker builds
+
+`Mango.MessageBus` is restored from the private GitHub Packages NuGet feed. Ensure the NuGet configuration used for restore includes the feed and that the build environment has permission to download the package. For Docker builds, the Dockerfile expects a BuildKit secret named `nugetconfig`; the secret provides NuGet configuration during restore without copying credentials into the image. Set `NUGET_CONFIG_PATH` to a valid NuGet configuration file before using the documented Docker build command. Do not commit a real token or a credential-bearing NuGet configuration.
+
+### v3.0.0 consumer migration notes
+
+- Use a .NET 10-compatible target framework.
+- Register `IMessageProducer` as a singleton.
+- Pass a non-empty message ID to `SendMessage`.
+- Supply `RabbitMqQueueOptions` that match the intended queue topology.
+- Verify the GitHub Packages feed and credentials for local, CI, and Docker restores.
+- Test the publisher and consumer together after package or queue configuration changes.
 
 ## Configuration
 
