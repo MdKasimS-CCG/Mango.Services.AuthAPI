@@ -40,20 +40,35 @@ namespace Mango.Services.AuthAPI.Service
 
         public async Task<LoginResponseDto> Login(LoginRequestDto loginRequestDto)
         {
-            var user = _db.ApplicationUsers.FirstOrDefault(u => u.UserName.ToLower() == loginRequestDto.UserName.ToLower());
-            bool isValid = await _userManager.CheckPasswordAsync(user, loginRequestDto.Password);
+            var user = _db.ApplicationUsers.FirstOrDefault(
+                u => u.UserName != null &&
+                    u.UserName.ToLower() == loginRequestDto.UserName.ToLower());
 
-            if (user == null || isValid == false)
+            if (user == null)
             {
-                return new LoginResponseDto() { User = null, Token = "" };
+                return new LoginResponseDto
+                {
+                    User = null,
+                    Token = ""
+                };
+            }
+
+            bool isValid = await _userManager.CheckPasswordAsync(
+                user,
+                loginRequestDto.Password);
+
+            if (!isValid)
+            {
+                return new LoginResponseDto
+                {
+                    User = null,
+                    Token = ""
+                };
             }
 
             var roles = await _userManager.GetRolesAsync(user);
-            //If user found, generate JWT token
-            //Check None mode - shows whole encrypted values conatining header, token value, etc
             var token = _jwtTokenGenerator.GenerateToken(user, roles);
 
-            //AuthAPI contains ApplicationUser (IdentityUser - a default User entity proivided by ASP.NET Identity
             UserDto userDto = new()
             {
                 Email = user.Email,
@@ -62,56 +77,38 @@ namespace Mango.Services.AuthAPI.Service
                 PhoneNumber = user.PhoneNumber
             };
 
-            LoginResponseDto loginResponseDto = new()
+            return new LoginResponseDto
             {
                 User = userDto,
                 Token = token
             };
-
-            return loginResponseDto;
-
         }
-
-        public async Task<string> Register(RegistrationRequestDto registrationRequestDto)
+        public async Task<(string ErrorMessage, string? UserId)> Register(
+        RegistrationRequestDto registrationRequestDto)
         {
-            //TODO: User creation timestamp missing.
-            //Like Name, add timestamp too.
-            ApplicationUser user = new ApplicationUser()
+            var user = new ApplicationUser
             {
                 UserName = registrationRequestDto.Email,
                 Email = registrationRequestDto.Email,
-                NormalizedEmail = registrationRequestDto.Email.ToUpper(),
+                NormalizedEmail = registrationRequestDto.Email.ToUpperInvariant(),
                 Name = registrationRequestDto.Name,
                 PhoneNumber = registrationRequestDto.PhoneNumber
             };
 
-            try
+            var result = await _userManager.CreateAsync(
+                user,
+                registrationRequestDto.Password);
+
+            if (result.Succeeded)
             {
-                var result = await _userManager.CreateAsync(user, registrationRequestDto.Password);
-                if (result.Succeeded)
-                {
-                    var userToReturn = _db.ApplicationUsers.First(u => u.UserName == registrationRequestDto.Email);
-                    UserDto userDto = new UserDto()
-                    {
-                        Email = userToReturn.Email,
-                        ID = userToReturn.Id,
-                        Name = userToReturn.Name,
-                        PhoneNumber = userToReturn.PhoneNumber
-                    };
-
-                    return "";
-                }
-                else
-                {
-                    return result.Errors.FirstOrDefault().Description;
-                }
+                return (string.Empty, user.Id);
             }
-            catch (Exception ex)
-            {
 
-            }
-            return "Error Encountered";
+            var errorMessage = string.Join(
+                "; ",
+                result.Errors.Select(error => error.Description));
 
+            return (errorMessage, null);
         }
     }
 }
