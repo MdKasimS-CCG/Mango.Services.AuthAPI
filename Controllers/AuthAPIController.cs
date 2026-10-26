@@ -1,12 +1,11 @@
 ﻿using Mango.MessageBus;
 using Mango.Services.AuthAPI.Models.Dto;
-using Mango.Services.AuthAPI.RabbitMqSender;
 using Mango.Services.AuthAPI.Service;
 using Mango.Services.AuthAPI.Service.IService;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-
+using Microsoft.Extensions.Options;
 namespace Mango.Services.AuthAPI.Controllers
 {
     /// <summary>
@@ -19,34 +18,28 @@ namespace Mango.Services.AuthAPI.Controllers
     {
         private readonly IAuthService _authService;
         protected ResponseDto _response;
-        protected IConfiguration _configuration;
-
-        // TODO: I have added respective interface & its concrete class in Mango.Integration. Switch to use that one.
-        // Since we are not going to keep any cloud based MQ as primary queuing technology.
+        private readonly ILogger<AuthAPIController> _logger;
+        private readonly AuthQueueOptions _authQueueOptions;
         protected IMessageProducer _messageBus;
 
-        //TODO: With Clean Architecture Try To Decouple This
-        /// <summary> 
-        /// SDE-Observation
-        /// You are coupling DbContext with Controllers. This will also couple 
-        /// EFCore with application. Changing ORM, will break solution.
-        /// Violating Separation Of Concerns principles at architect level
-        /// </summary>
-        /// <param name="db"></param>
-        /// <param name="mapper"></param>
-        public AuthAPIController(IAuthService service, IMessageProducer messageBus, IConfiguration configuration)
+        public AuthAPIController(
+            IAuthService service,
+            IMessageProducer messageBus,
+            ILogger<AuthAPIController> logger,
+            IOptions<AuthQueueOptions> authQueueOptions)
         {
             _authService = service;
             _response = new();
             _messageBus = messageBus;
-            _configuration = configuration;
+            _logger = logger;
+            _authQueueOptions = authQueueOptions.Value;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegistrationRequestDto model)
         {
             //TODO: When the user was created, timestamp is missing
-            var errorMessage = await _authService.Register(model);
+            var (errorMessage, userId) = await _authService.Register(model);
 
             if (!string.IsNullOrEmpty(errorMessage))
             {
@@ -63,8 +56,41 @@ namespace Mango.Services.AuthAPI.Controllers
                 PhoneNumber = model.PhoneNumber,
             };
 
-            await _messageBus.SendMessage(userDto, _configuration.GetValue<string>("TopicAndQueueNames:RegisterUserQueue"));
-            return Ok(_response);
+        var registerUserQueue = _authQueueOptions.RegisterUserQueue;
+
+        var queueOptions = new RabbitMqQueueOptions
+        {
+            Durable = true,
+            Arguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "email.dlx",
+                ["x-dead-letter-routing-key"] = registerUserQueue
+            }
+        };
+
+        var messageId = Guid.NewGuid().ToString();
+
+        try
+        {
+            await _messageBus.SendMessage(
+                userDto,
+                registerUserQueue,
+                messageId,
+                queueOptions);
+        }
+        catch (Exception ex)
+        {
+            // The user has already been registered. Log the publishing failure
+            // without turning the successful registration into a failed response.
+            _logger.LogError(
+                ex,
+                "User registration succeeded for user {UserId}, but publishing to queue {QueueName} failed. MessageId: {MessageId}",
+                userId,
+                registerUserQueue,
+                messageId);
+        }
+
+        return Ok(_response);
         }
 
         [HttpPost("login")]
