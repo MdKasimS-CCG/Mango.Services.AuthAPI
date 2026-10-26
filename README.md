@@ -94,13 +94,37 @@ AuthAPI now uses the shared `Mango.MessageBus` NuGet package for RabbitMQ publis
 `Program.cs` binds the RabbitMQ settings from `MessageQueue:RabbitMQ` and registers the producer as a singleton:
 
 ```csharp
-builder.Services.Configure<RabbitMqSettings>(
-    builder.Configuration.GetSection("MessageQueue:RabbitMQ"));
+builder.Services
+    .AddOptions<RabbitMqSettings>()
+    .Bind(builder.Configuration.GetSection("MessageQueue:RabbitMQ"))
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.HostName),
+        "RabbitMQ HostName is required.")
+    .Validate(
+        settings => settings.Port is >= 1 and <= 65535,
+        "RabbitMQ Port must be between 1 and 65535.")
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.UserName),
+        "RabbitMQ UserName is required.")
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.Password),
+        "RabbitMQ Password is required.")
+    .Validate(
+        settings => !string.IsNullOrWhiteSpace(settings.VirtualHost),
+        "RabbitMQ VirtualHost is required.")
+    .ValidateOnStart();
+
+builder.Services
+    .AddOptions<AuthQueueOptions>()
+    .Bind(builder.Configuration.GetSection("TopicAndQueueNames"))
+    .Validate(
+        options => !string.IsNullOrWhiteSpace(options.RegisterUserQueue),
+        "TopicAndQueueNames:RegisterUserQueue is required.")
+    .ValidateOnStart();
 
 builder.Services.AddSingleton<IMessageProducer, RabbitMQMessageProducer>();
 ```
-
-The singleton lifetime allows the producer to reuse its RabbitMQ connection across requests. RabbitMQ connection settings must be provided through the service configuration.
+The RabbitMQ settings are bound from `MessageQueue:RabbitMQ` and validated at startup. The registration queue is bound from `TopicAndQueueNames` and must be configured before the application starts. `IMessageProducer` is registered as a singleton. Supply the required connection settings and queue name through the active configuration profile.
 
 ### Registration message publishing
 
