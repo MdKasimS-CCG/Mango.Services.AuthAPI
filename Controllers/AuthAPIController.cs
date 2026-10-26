@@ -62,7 +62,31 @@ namespace Mango.Services.AuthAPI.Controllers
                 PhoneNumber = model.PhoneNumber,
             };
 
-            await _messageBus.SendMessage(userDto, _configuration.GetValue<string>("TopicAndQueueNames:RegisterUserQueue"));
+        var registerUserQueue = _configuration.GetValue<string>(
+            "TopicAndQueueNames:RegisterUserQueue");
+
+        if (string.IsNullOrWhiteSpace(registerUserQueue))
+        {
+            throw new InvalidOperationException(
+                "RegisterUserQueue is not configured.");
+        }
+
+        var queueOptions = new RabbitMqQueueOptions
+        {
+            Durable = true,
+            Arguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "email.dlx",
+                ["x-dead-letter-routing-key"] = registerUserQueue
+            }
+        };
+            var messageId = Guid.NewGuid().ToString();
+
+            await _messageBus.SendMessage(
+                userDto,
+                registerUserQueue,
+                messageId,
+                queueOptions);
             return Ok(_response);
         }
 
